@@ -152,4 +152,10 @@ class JamesController extends Controller
     {
         return Auth::guard('admin');
     }
+
+    protected function sendLockoutResponseMessage(Request $request) {
+        $seconds = $this->limiter()->availableIn($this->throttleKey($request));
+        $min = $this->decayMinutes();
+        return ['登录过于频繁，'.ceil($seconds / 60).'分钟后重试'];
+    }
 }
