@@ -8,9 +8,14 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Foundation\Auth\ThrottlesLogins;
+use Illuminate\Validation\ValidationException;
 
 class JamesController extends Controller
 {
+    use ThrottlesLogins;
+    protected $maxAttempts = 3;
+    protected $decayMinutes = 30;
     /**
      * Show the login page.
      *
@@ -34,27 +39,56 @@ class JamesController extends Controller
      */
     public function postLogin(Request $request)
     {
-        $credentials = $request->only([$this->username(), 'password']);
-        $remember = $request->get('remember', false);
 
-        /** @var \Illuminate\Validation\Validator $validator */
-        $validator = Validator::make($request->all(), [
-            $this->username()   => 'required',
-            'password'          => 'required',
-            'captcha'           => 'required|captcha',
-        ]);
-
-        if ($validator->fails()) {
-            return back()->withInput()->withErrors($validator);
+        try {
+            // 判断登录失败是否超过$maxAttempts次，超过$decayMinutes分钟后，接触锁定
+            if (method_exists($this, 'hasTooManyLoginAttempts') && $this->hasTooManyLoginAttempts($request)) {
+                $this->fireLockoutEvent($request);
+                return back()->withInput()->withErrors([
+                    $this->username() => $this->sendLockoutResponseMessage($request),
+                ]);
+            }
+            // 正常登录的话，进行validator
+            $validator = Validator::make($request->all(), [
+                $this->username()   => 'required',
+                'password'          => 'required',
+                'captcha'           => 'required|captcha',
+            ], [
+                $this->username().'.required' => '用户名必填',
+                'password.required'           => '密码必填',
+                'captcha.required'            => '验证码必填',
+                'captcha.captcha'             => '验证码错误',
+            ]);
+            // 验证错误，抛出错误信息
+            if ($validator->fails()) {
+                return back()->withInput()->withErrors($validator);
+            }
+            // 验证正确，就去验证账号、密码是否有错误
+            $credentials = $request->only([$this->username(), 'password']);
+            $remember = $request->get('remember', false);
+            // 账号密码正确
+            if ($this->guard()->attempt($credentials, $remember)) {
+                $res = $this->sendLoginResponse($request);
+                $this->clearLoginAttempts($request);
+                return $res;
+            }
+            // 账号、密码错误，计数+1
+            $this->incrementLoginAttempts($request);
+            $num = $this->limiter()->attempts($this->throttleKey($request));
+            $is_num = $this->maxAttempts - $num;
+            return back()->withInput()->withErrors([
+                $this->username()  => $is_num == 0 ? $this->sendLockoutResponseMessage($request):$this->getFailedLoginMessage().', 你还有'.$is_num.'次机会',
+            ]);
+        }catch (ValidationException $validationException) {
+            $message = $validationException->validator->getMessageBag()->getMessages();
+            $str = '';
+            if (isset($message['password'])) {
+                $str = $message['password'];
+            }
+            return back()->withInput()->withErrors([
+                $this->username() => $str,
+            ]);
         }
-
-        if ($this->guard()->attempt($credentials, $remember)) {
-            return $this->sendLoginResponse($request);
-        }
-
-        return back()->withInput()->withErrors([
-            $this->username() => $this->getFailedLoginMessage(),
-        ]);
     }
 
     /**
@@ -65,6 +99,8 @@ class JamesController extends Controller
         return Lang::has('auth.failed')
             ? trans('auth.failed')
             : 'These credentials do not match our records.';
+
+
     }
 
     /**
