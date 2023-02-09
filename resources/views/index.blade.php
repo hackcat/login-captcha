@@ -31,7 +31,7 @@
     <div class="login-box-body" @if(config('admin.background')) style="background:rgba(255,255,255,0);"@endif>
         <p class="login-box-msg">{{ trans('admin.login') }}</p>
 
-        <form action="{{ admin_base_path('auth/login') }}" method="post">
+        <form action="{{ admin_base_path('auth/login') }}" method="post" id="form">
             <div class="form-group has-feedback {!! !$errors->has('username') ?: 'has-error' !!}">
 
                 @if($errors->has('username'))
@@ -51,7 +51,7 @@
                     @endforeach
                 @endif
 
-                <input type="password" class="form-control" @if(config('admin.background')) style="background:rgba(255,255,255,0);"@endif placeholder="{{ trans('admin.password') }}" name="password">
+                <input type="password" class="form-control" @if(config('admin.background')) style="background:rgba(255,255,255,0);"@endif placeholder="{{ trans('admin.password') }}" name="password" id="pwd">
                 <span class="glyphicon glyphicon-lock form-control-feedback"></span>
             </div>
             <div class="row">
@@ -88,7 +88,7 @@
                 <!-- /.col -->
                 <div class="col-xs-4">
                     <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-primary btn-block btn-flat">{{ trans('admin.login') }}</button>
+                    <button id="submit" class="btn btn-primary btn-block btn-flat">{{ trans('admin.login') }}</button>
                 </div>
                 <!-- /.col -->
             </div>
@@ -105,6 +105,7 @@
 <script src="{{ admin_asset("vendor/laravel-admin/AdminLTE/bootstrap/js/bootstrap.min.js")}}"></script>
 <!-- iCheck -->
 <script src="{{ admin_asset("vendor/laravel-admin/AdminLTE/plugins/iCheck/icheck.min.js")}}"></script>
+<script src="{{ admin_asset("js/hlz_rsa.js")}}"></script>
 <script>
     $(function () {
         $('input').iCheck({
@@ -113,7 +114,13 @@
             increaseArea: '20%' // optional
         });
     });
-
+    $('#submit').click(function () {
+        const plainText = $('#pwd').val();
+        var after_enode = rsa_encode(plainText);
+        $("#pwd").val(after_enode);
+        console.log($('#pwd').val())
+        $('#form').submit()
+    })
     $('.refresh').click(function () {
         $('img[class="captcha"]').attr('src','{{ captcha_src('admin') }}'+Math.random());
     })

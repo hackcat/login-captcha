@@ -39,7 +39,9 @@ class JamesController extends Controller
      */
     public function postLogin(Request $request)
     {
-
+        // 先对密码解密
+        $pwd = $this->rsa($request->password);
+        $request['password'] = $pwd;
         try {
             // 判断登录失败是否超过$maxAttempts次，超过$decayMinutes分钟后，接触锁定
             if (method_exists($this, 'hasTooManyLoginAttempts') && $this->hasTooManyLoginAttempts($request)) {
@@ -89,6 +91,32 @@ class JamesController extends Controller
                 $this->username() => $str,
             ]);
         }
+    }
+
+    public function rsa($after_encode_data) {
+        $private_key = '-----BEGIN RSA PRIVATE KEY-----
+MIICWwIBAAKBgQCZD5mNWaQpxEwSU/WSFMilxJp+HLHgXQo1U93FOUwhX2+/MFde
+w+yGxQw/1qoluctNJisH7Q6KIkcOM8ysSLNrZ6i5kAlhsFPHEV7VdIG4whK+2mp8
+hxRsUOVn1IGOalSFF6HpRTYW+XpA2Lr3RMmHatjZec63vDLa4VJjpK/7nwIDAQAB
+AoGAEiry2/9O6BI/wVEr7en/owWCHQQE7Q++HXRV94oEilWMqxHu3PW+hoSvHoi5
+a37xLbghFXDC8Ax/iKUHX0/F1APczBmZoDqMzDPcXvbsJEUP2B2kwB68XT1LCd5d
+k8s7CClNlgxR7Ukpk82XAzfDsrocizh0Zc1ctEH4/Oe7iDkCQQDGcZtLI1J/fSMl
+sxhgUyszyNWXs48pwJbKz5DZTyzhSZOuk8QU+Gtnx8QVjYD88NrTPgqCcGW4qZDX
+R41jN0Y1AkEAxXRUlska3iMQPFhaRqky6tu5wbcZesxQrlLyWSupi/o2WAyvipwy
+uVME5uPZxbGP3mqNgpYonz7cftQlYOKlAwJAdurTfcZwBJgPvOLDI84TIJgkbyEa
+FJIliumxypeotGSsDDzejxaC/pD2j1fZyTnoWBhgoeQLAQsUEf3920vfVQJAcabF
+0YyrlFSmUbWhMK7PCfOy9ddIKTBU+CHyMHU7P8CjawbSO3wwjg9E8QkRHgNYBfNa
+xGFdvFtYWwANC7kotQJATaljqR8D8aVxLKsF4XJyiE2OeuLJDTsKbFjD6dNEJekH
+buIPqTkZr4D6nZ2Lx2j1B+rbp+4MM2X1z3pv/IXRkg==
+-----END RSA PRIVATE KEY-----
+';
+        openssl_private_decrypt(
+            base64_decode($after_encode_data),
+            $decode_result,
+            $private_key
+        );
+
+        return $decode_result;
     }
 
     /**
